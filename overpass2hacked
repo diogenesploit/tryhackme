@@ -1,0 +1,164 @@
+# 10.23.20
+# TryHackMe - Overpass 2
+# https://tryhackme.com/room/overpass2hacked
+
+        Task 1
+
+  - Download the PCAP file and move it to the overpass2/pcap directory
+  - Convert the .pcapng (next generation) into pcap for wireshark
+    compatibility
+
+editcap overpass2.pcapng overpass2.pcap
+
+  - Spin up Wireshark in order to find out where they were able to
+    send through a reverse shell
+
+wireshark overpass2.pcap
+
+  - Briefly scanning through the results, you can see that the attacker
+    was able to upload a php file in order to gain access - payload.php
+    using the /development section intended for uploading .overpass files
+\\
+What was the URL of the page they used to upload a reverse shell?
+//
+  - Next we need to figure out what payload the attacker used to gain
+    access
+  - We see that the attacker did a POST, so right-click and Follow -> TCP
+    stream. Analyze this file. You can see that the attacker used this
+    php script to inject code and gain shell. This is also our flag.
+\\
+What payload did the attacker use to gain access?
+//
+  - Next we should find what password the attacker used to priv escalate
+  - Scroll down in Wireshark. You can see on line 34-36 the attacker lines are
+    highlighted in black. Let's check out line 36. Right click Follow TCP.
+  - The attacker uses sudo -l to show the user james's password.
+    sudo -l also displays what commands user james can execute (ALL : ALL)
+  - The attacker cats the /etc/shadow file, where password hashes are stored.
+  - You can also see the attacker git clones ssh-backdoor. This is our fourth
+    flag.
+\\
+How did the attacker establish persistence?
+//
+  - Let's go ahead and attempt to crack these hashes ourselves. Copy/paste the
+    hashes into .txt files. I labeled mine h1.txt, h2.txt .. etc.
+    Using JohnTheRipper, you can run multiple hash files at a time. We get the
+    suggestion of using the fasttrack wordlist, so let's give that a shot
+    - Make sure to run John in the same directory as your hash files
+
+sudo john h1.txt h2.txt h3.txt h4.txt h5.txt --wordlist=/usr/share/wordlists/fasttrack.txt
+
+    John will be able to crack these almost instantly. To see the results, we
+    need --show.
+
+sudo john h1.txt h2.txt h3.txt h4.txt h5.txt --show
+
+Result:
+paradox:secuirty3:18464:0:99999:7:::
+szymex:abcd123:18464:0:99999:7:::
+bee:secret12:18464:0:99999:7:::
+muirland:1qaz2wsx:18464:0:99999:7:::
+
+4 password hashes cracked, 1 left
+
+\\
+Using the fasttrack wordlist, how many of the system passwords were crackable?
+//
+
+        Task 2
+
+Now that you've found the code for the backdoor, it's time to analyze it.
+
+  - With a quick glance at the flags, we know we can already answer 3 and 4 off the bat.
+    The hash is located in the TCP stream we analyzed earlier and can be found
+    when the attacker runs "backdoor"
+\\
+What was the hash the attacker used? - go back to the PCAP for this!
+//
+  - It's a good idea to git clone the same ssh-backdoor binary that the
+    attacker used in order to figure out how exactly the attacker operated.
+    I like to clone things into my /opt directory, so I cd'd into there and
+    ran:
+
+sudo git clone "https://github.com/NinjaJc01/ssh-backdoor"
+
+    Everything will install and unpack and it's ready to go.
+    Let's look at the files.
+
+gedit(or text editor of your choice) main.go
+
+    Looking at the source code we can see the hash string.
+    This is going to be the answer to flag 1.
+\\
+What's the default hash for the backdoor?
+//
+    We can also see the hardcoded salt in the very last line of code.
+\\
+What's the hardcoded salt for the backdoor?
+//
+    Now that we have the salt, we can crack the hash.
+    We'll use hashcat for this as it's got an easy way to specify salt on
+    a hash. Using module 1710 (-m 1710) all we have to do is provide the
+    hash and salt in this format:
+    hash:salt
+    and hashcat will go to work cracking it.
+    Be sure to include a wordlist, in this case rockyou.txt
+    If hashcat is uncooperative, you may need to tack --force onto it.
+
+hashcat -m 1710 "6d05358f090eea56a238af02e47d44ee5489d234810ef6240280857ec69712a3e5e370b8a41899d0196ade16c0d54327c5654019292cbfe0b5e98ad1fec71bed:1c362db832f3f864c8c2fe05f2002a05" --force /usr/share/wordlists/rockyou.txt
+
+    After a little while hashcat will return the cracked password,
+    which completes our final flag for this section.
+\\
+Crack the hash using rockyou and a cracking tool of your choice. What's the
+password?
+//
+
+        Task 3
+
+  Now we're tasked with getting back into the machine. Go ahead and deploy it
+  after double checking that ovpn is connected.
+  Go to the website's IP address and find your first flag.
+\\
+The attacker defaced the website. What message did they leave as a heading?
+H4ck3d by CooctusClan
+//
+  - Now let's break in. Since we already know the passwords, assuming the
+    users haven't changed them, we can SSH into the machine.
+    We can run an nmap scan if we want while we set up everything else.
+
+IP=10.10.91.182
+nmap -sC -sV $IP
+
+  - In another terminal window, using some of the information we learned from
+    the ssh backdoor script, we can gain access into the system.
+    We know that the port will be 2222 as that's the default port set in the
+    main.go file. We also have the password that we cracked with hashcat.
+
+ssh -p 2222 james@10.10.91.182
+yes
+james@10.10.91.182's password:
+
+  - Now we're in. Let's go to the desktop and try to find the user.txt.
+
+cd ..
+ls -la
+cat user.txt
+\\
+What's the user flag?
+//
+  - We can also see here a reg highlight on .suid_bash This means that as
+    the user james, we've got rwx access to it. Run ./.suid_bash -p
+
+whoami
+
+Result:
+root
+
+  - Let's navigate into the root directory to try and find our flag.
+
+\\
+What's the root flag?
+//
+
+  And there we go, we've finished the box!
