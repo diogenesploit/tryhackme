@@ -97,7 +97,7 @@ getuid
 
   Next find a system process to migrate to with the correct permissions to
   stabilize the shell and ensure permissions of a privileged user.
-  You can use services.exe here, PID 668. Try also with spoolsv.exe PID 1224
+  You can use services.exe here, PID 668.
 
   Next:
 
@@ -119,7 +119,3 @@ Directory of C:\Windows\system32\config
 - cd into that directory and type the file
 
 type root.txt
-
-  Result:
-
-dff0f748678f280250f25a45b8046b4a
